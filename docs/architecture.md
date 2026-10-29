@@ -11,6 +11,7 @@
 | `src/server.ts` | MCP session management and request routing |
 | `src/tools.ts` | The 9 MCP tool definitions: input schemas + response formatting |
 | `src/api.ts` | BCS form-based API: HTML GET/POST, form-state parsing, day-type classification |
+| `src/week.ts` | Week-view (Wochenbuchen) booking: task x day cell read/book/edit/delete, used when `BCS_BOOKING_VIEW=week`; calls BCS only through `auth.authenticatedFetch` |
 | `src/auth.ts` | BCS authentication: login, CSRF, TOTP 2FA, `.bcs-session` persistence, config (`zod`) |
 | `src/logger.ts` | Console + file logging (`bcs-mcp.log`), imported by all modules |
 
@@ -27,7 +28,7 @@
 
 1. **Startup** — `index.ts` picks the transport → `server.ts` creates the MCP
    server and registers the 9 tools.
-2. **Auth** — `auth.login()`: GET login page → POST credentials to the form's
+2. **Auth** — with `BCS_SESSION_ID`/`BCS_CSRF_TOKEN` (SSO cookies from a browser login) the session is used as-is and never renewed. Otherwise `auth.login()`: GET login page → POST credentials to the form's
    session-specific action URL → probe `GET /bcs` → if redirected to
    `totpVerification`, generate a TOTP (server-time corrected) and POST it →
    cache the session (30-min TTL).

@@ -47,6 +47,27 @@ BCS_TOTP_SECRET=your-base32-totp-secret
 
 To find your `BCS_USER_OID`: open BCS, navigate to day effort recording, and look for the `oid` query parameter in the URL.
 
+### Booking view (day vs. week)
+
+By default `bcs_get_tasks`, `bcs_book_effort`, `bcs_edit_effort` and `bcs_delete_effort` use the BCS *day* view (Tagesbuchen). That only works if your saved day layout shows the task tree ("Aufgabenbaum"), and some BCS versions lock saved bookings there. Set
+
+```env
+BCS_BOOKING_VIEW=week
+```
+
+to use the *week* view (Wochenbuchen) instead: independent of your layout, one entry per task and day (`taskLineOid` = the task OID from `bcs_get_tasks`, `projectOid` is optional). Editing and deleting work by rewriting or clearing that cell. Tasks that BCS shows read-only (locked bookings) are rejected with an error. Attendance, day/week summaries, vacation and overtime still read the day view and other pages and are unaffected by this switch.
+
+### SSO / OIDC login
+
+If your BCS uses SSO (OIDC), there is no password to send: BCS itself handles the IdP redirect. Log in to BCS in your browser, then copy the `JSESSIONID` and `CSRF_Token` cookies (devtools → Application/Storage → Cookies) into:
+
+```env
+BCS_SESSION_ID=<JSESSIONID value>
+BCS_CSRF_TOKEN=<CSRF_Token value>
+```
+
+When both are set, `BCS_USERNAME`, `BCS_PASSWORD` and `BCS_TOTP_SECRET` are not needed and are ignored. The server cannot renew an SSO session: when BCS expires it, requests fail with an error telling you to log in again and update the two values (restart the server/client afterwards).
+
 `BCS_TOTP_SECRET` is the Base32-encoded secret from your authenticator app setup. If your BCS account does not use 2FA, leave it empty or omit it entirely.
 
 ## Build and run
@@ -142,6 +163,18 @@ Then ask Claude something like:
 > "Show me my week summary"
 
 > "How many vacation days do I have left?"
+
+## Docker / Bifrost
+
+```bash
+docker build -t bcs-mcp .
+docker run --rm -p 3000:3000 --env-file .env bcs-mcp   # MCP endpoint: http://localhost:3000/mcp, probe: /health
+```
+
+Register it in Bifrost as an HTTP MCP client with the URL `http://<container-host>:3000/mcp`. Configuration is via environment variables only (`BCS_URL`, `BCS_USER_OID`, and either `BCS_USERNAME`/`BCS_PASSWORD` or the SSO cookies `BCS_SESSION_ID`/`BCS_CSRF_TOKEN`, plus optional `BCS_TOTP_SECRET`, `BCS_BOOKING_VIEW`, `PORT`). Pass them from your secret store, never bake them into the image.
+
+- One container per BCS user: it acts as that user, and the `/mcp` endpoint has no authentication of its own. Keep it on a private network behind Bifrost.
+- SSO cookies expire on the BCS side and cannot be renewed by the container; with password login the server re-authenticates itself.
 
 ## Architecture
 
