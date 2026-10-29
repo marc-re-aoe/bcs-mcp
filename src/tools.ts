@@ -11,7 +11,22 @@ import {
   getOvertimeBalance,
   getVacationStatus,
 } from "./api.js";
+import {
+  getWeekTasks,
+  bookWeekEffort,
+  editWeekEffort,
+  deleteWeekEffort,
+} from "./week.js";
 import { log } from "./logger.js";
+
+// BCS_BOOKING_VIEW=week books through the week view (Wochenbuchen) instead of
+// the day view, which only works if the user's day layout shows the task tree.
+const weekView = (): boolean => process.env["BCS_BOOKING_VIEW"] === "week";
+
+function requireProject(projectOid: string | undefined): string {
+  if (!projectOid) throw new Error("projectOid is required in day booking view");
+  return projectOid;
+}
 
 function jsonResponse(data: unknown): {
   content: [{ type: "text"; text: string }];
@@ -55,11 +70,18 @@ export function registerTools(server: McpServer): void {
     "List bookable tasks for a project. Use bcs_get_day_summary first to get project OIDs, then expand a project to see its tasks.",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      projectOid: z.string().describe("Project OID from bcs_get_day_summary"),
+      projectOid: z
+        .string()
+        .optional()
+        .describe(
+          "Project OID from bcs_get_day_summary (required in day booking view, optional filter/ignored in week view)",
+        ),
     },
     async ({ date, projectOid }) => {
       log("tool:call", "bcs_get_tasks", { date, projectOid });
-      const tasks = await getTasksForProject(date, projectOid);
+      const tasks = weekView()
+        ? await getWeekTasks(date, projectOid)
+        : await getTasksForProject(date, requireProject(projectOid));
       log("tool:result", "bcs_get_tasks", tasks);
       return jsonResponse(tasks);
     },
@@ -70,7 +92,12 @@ export function registerTools(server: McpServer): void {
     "Book time to a task. Use bcs_get_day_summary for projectOid, then bcs_get_tasks for taskLineOid.",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      projectOid: z.string().describe("Project OID from bcs_get_day_summary"),
+      projectOid: z
+        .string()
+        .optional()
+        .describe(
+          "Project OID from bcs_get_day_summary (required in day booking view, optional filter/ignored in week view)",
+        ),
       taskLineOid: z.string().describe("Task lineOid from bcs_get_tasks"),
       hours: z.number().int().min(0).describe("Hours to book"),
       minutes: z
@@ -92,14 +119,22 @@ export function registerTools(server: McpServer): void {
         description,
       });
       try {
-        const result = await bookEffort({
-          date,
-          projectOid,
-          taskLineOid,
-          hours,
-          minutes,
-          description,
-        });
+        const result = weekView()
+          ? await bookWeekEffort({
+              date,
+              taskOid: taskLineOid,
+              hours,
+              minutes,
+              description,
+            })
+          : await bookEffort({
+              date,
+              projectOid: requireProject(projectOid),
+              taskLineOid,
+              hours,
+              minutes,
+              description,
+            });
         log("tool:result", "bcs_book_effort", result);
         return jsonResponse(result);
       } catch (err) {
@@ -115,7 +150,12 @@ export function registerTools(server: McpServer): void {
     "Edit an existing booked effort entry's time and/or description. Use bcs_get_tasks to find the taskLineOid of the entry to edit. At least one of hours, minutes, or description must be given; omitted fields keep their current value. Rejected if the entry has an explicit start/end time range and the duration is changing — delete and rebook instead.",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      projectOid: z.string().describe("Project OID from bcs_get_day_summary"),
+      projectOid: z
+        .string()
+        .optional()
+        .describe(
+          "Project OID from bcs_get_day_summary (required in day booking view, optional filter/ignored in week view)",
+        ),
       taskLineOid: z.string().describe("Task lineOid of the effort to edit"),
       hours: z
         .number()
@@ -145,14 +185,22 @@ export function registerTools(server: McpServer): void {
         description,
       });
       try {
-        const result = await editEffort({
-          date,
-          projectOid,
-          taskLineOid,
-          hours,
-          minutes,
-          description,
-        });
+        const result = weekView()
+          ? await editWeekEffort({
+              date,
+              taskOid: taskLineOid,
+              hours,
+              minutes,
+              description,
+            })
+          : await editEffort({
+              date,
+              projectOid: requireProject(projectOid),
+              taskLineOid,
+              hours,
+              minutes,
+              description,
+            });
         log("tool:result", "bcs_edit_effort", result);
         return jsonResponse(result);
       } catch (err) {
@@ -168,13 +216,24 @@ export function registerTools(server: McpServer): void {
     "Delete a booked effort entry. Use bcs_get_tasks to find the taskLineOid of the entry to delete.",
     {
       date: z.string().describe("Date in YYYY-MM-DD format"),
-      projectOid: z.string().describe("Project OID from bcs_get_day_summary"),
+      projectOid: z
+        .string()
+        .optional()
+        .describe(
+          "Project OID from bcs_get_day_summary (required in day booking view, optional filter/ignored in week view)",
+        ),
       taskLineOid: z.string().describe("Task lineOid of the effort to delete"),
     },
     async ({ date, projectOid, taskLineOid }) => {
       log("tool:call", "bcs_delete_effort", { date, projectOid, taskLineOid });
       try {
-        const result = await deleteEffort({ date, projectOid, taskLineOid });
+        const result = weekView()
+          ? await deleteWeekEffort({ date, taskOid: taskLineOid })
+          : await deleteEffort({
+              date,
+              projectOid: requireProject(projectOid),
+              taskLineOid,
+            });
         log("tool:result", "bcs_delete_effort", result);
         return jsonResponse(result);
       } catch (err) {
