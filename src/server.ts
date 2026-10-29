@@ -91,6 +91,8 @@ export function createMcpHandler(): McpHandler {
     );
     if (url.pathname === "/mcp") {
       await handleMcp(req, res);
+    } else if (url.pathname === "/health") {
+      res.writeHead(200).end("ok");
     } else {
       res.writeHead(404).end("Not Found");
     }
