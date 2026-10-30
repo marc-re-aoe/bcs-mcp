@@ -1,6 +1,6 @@
 import { parse as parseHtml } from "node-html-parser";
 import { authenticatedFetch, getConfig } from "./auth.js";
-import { parseFormState } from "./api.js";
+import { parseFormState, withoutCloseFlag } from "./api.js";
 import { log } from "./logger.js";
 
 // Week booking view ("Wochenbuchen"): one editable cell per task and day.
@@ -144,7 +144,7 @@ async function writeCell(
       Origin: config.BCS_URL,
       Referer: `${config.BCS_URL}${WEEK_PATH}?oid=${config.BCS_USER_OID}`,
     },
-    body: body.toString(),
+    body: withoutCloseFlag(body),
   });
   if (!res.ok) throw new Error(`Failed to save week page: ${res.status}`);
 

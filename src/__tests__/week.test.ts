@@ -22,11 +22,14 @@ const TASK = "TASK1_JTask";
 // 2026-10-30 00:00 in Europe/Berlin (CET) = 2026-10-29T23:00Z
 const TS = String(Date.UTC(2026, 9, 29, 23));
 const CELL = `listeditoid_${TASK}.days_${TS}`;
+const CLOSE = `listeditoid_${TASK}.closeReferenceState`;
 
 function weekHtml(opts: { h?: string; m?: string; desc?: string; locked?: boolean } = {}) {
   const ro = opts.locked ? " readonly" : "";
   return `<form>
   <input type="hidden" name="transactionId" value="T1">
+  <input type="hidden" name="${CELLS}closeReferenceState,!${CLOSE}" value="false">
+  <input type="checkbox" name="${CELLS}closeReferenceState,${CLOSE}" value="true" checked>
   <table><tr>
     <td><a data-tt="PROJ1_JProject"><span>ADAC Test</span></a></td>
     <td><a data-tt="${TASK}"><span>Migration</span></a></td>
@@ -95,6 +98,16 @@ describe("week booking", () => {
     expect(body.get(`${CELLS}effortAttributesPopup,description,${CELL}.effortAttributesPopup`)).toBe("api work");
     expect(body.get("multidaytimerecording,Apply")).toBe("Speichern");
     expect(body.get("transactionId")).toBe("T1");
+  });
+
+  it("never posts the close-task (beendet) flag", async () => {
+    mockSave(weekHtml(), weekHtml({ h: "1", m: "00", desc: "x" }));
+    await bookWeekEffort({
+      date: "2026-10-30", taskOid: TASK, hours: 1, minutes: 0, description: "x",
+    });
+    const body = postedBody();
+    expect(body.has(`${CELLS}closeReferenceState,${CLOSE}`)).toBe(false);
+    expect(body.get(`${CELLS}closeReferenceState,!${CLOSE}`)).toBe("false");
   });
 
   it("reports failure when BCS did not apply the change", async () => {

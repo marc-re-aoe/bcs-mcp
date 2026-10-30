@@ -170,6 +170,19 @@ export function parseFormState(html: string): [string, string][] {
   return fields;
 }
 
+// A booking must never end ("beendet") a task: drop every "close task"
+// checkbox from a posted form so it is always sent unchecked. The `!` marker
+// field that precedes it is kept, as BCS expects.
+export function withoutCloseFlag(body: URLSearchParams): string {
+  const out = new URLSearchParams();
+  for (const [name, value] of body) {
+    if (!/,listeditoid_[^,]*\.closeReferenceState$/.test(name)) {
+      out.append(name, value);
+    }
+  }
+  return out.toString();
+}
+
 export function toFormMap(fields: [string, string][]): Map<string, string> {
   return new Map(fields);
 }
@@ -658,7 +671,7 @@ export async function setAttendance(params: {
       Origin: config.BCS_URL,
       Referer: `${config.BCS_URL}${PAGE_PATH}?oid=${config.BCS_USER_OID}`,
     },
-    body: body.toString(),
+    body: withoutCloseFlag(body),
   });
 
   return { success: response.ok };
@@ -807,7 +820,7 @@ export async function deleteEffort(params: {
       Origin: config.BCS_URL,
       Referer: `${config.BCS_URL}${PAGE_PATH}?oid=${config.BCS_USER_OID}`,
     },
-    body: body.toString(),
+    body: withoutCloseFlag(body),
   });
 
   if (!response.ok) {
@@ -957,7 +970,7 @@ export async function editEffort(params: {
       Origin: config.BCS_URL,
       Referer: `${config.BCS_URL}${PAGE_PATH}?oid=${config.BCS_USER_OID}`,
     },
-    body: body.toString(),
+    body: withoutCloseFlag(body),
   });
 
   if (!response.ok) {
@@ -1211,7 +1224,7 @@ export async function bookEffort(params: {
       Origin: config.BCS_URL,
       Referer: `${config.BCS_URL}${PAGE_PATH}?oid=${config.BCS_USER_OID}`,
     },
-    body: body.toString(),
+    body: withoutCloseFlag(body),
   });
 
   if (!response.ok) {
