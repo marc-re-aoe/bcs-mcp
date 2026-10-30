@@ -25,6 +25,9 @@ build, gitleaks, and a Docker build that is not pushed.
   `!` marker or `BREAKING CHANGE:` footer -> major. `docs:`, `chore:`, `test:`,
   `refactor:` alone cause no release.
 - The first release is `1.0.0` (no earlier tag exists).
+- The GitHub plugin does not comment on issues/PRs or add labels
+  (`successComment`/`releasedLabels` off): commits reference PR numbers from
+  before this repo, and the lookup of those failed the release job.
 - The **git tag is the only source of the version.** `package.json` keeps its
   placeholder version; nothing is committed back to `main`, so branch
   protection needs no bypass.
