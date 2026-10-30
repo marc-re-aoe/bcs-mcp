@@ -173,6 +173,7 @@ docker run --rm -p 3000:3000 --env-file .env bcs-mcp   # MCP endpoint: http://lo
 
 Register it in Bifrost as an HTTP MCP client with the URL `http://<container-host>:3000/mcp`. Configuration is via environment variables only (`BCS_URL`, `BCS_USER_OID`, and either `BCS_USERNAME`/`BCS_PASSWORD` or the SSO cookies `BCS_SESSION_ID`/`BCS_CSRF_TOKEN`, plus optional `BCS_TOTP_SECRET`, `BCS_BOOKING_VIEW`, `PORT`). Pass them from your secret store, never bake them into the image.
 
+- Images are built and pushed to `ghcr.io/<owner>/bcs-mcp:<version>` (and `:latest`) by the release pipeline on every merge to `main` that contains a `feat:`/`fix:` commit; see `docs/release.md`.
 - One container per BCS user: it acts as that user, and the `/mcp` endpoint has no authentication of its own. Keep it on a private network behind Bifrost.
 - SSO cookies expire on the BCS side and cannot be renewed by the container; with password login the server re-authenticates itself.
 
