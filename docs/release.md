@@ -7,7 +7,8 @@
 
 ## Pipeline
 
-1. **verify** — `pnpm verify` and `pnpm build` must be green.
+1. **verify** and **gitleaks** — `pnpm verify` and `pnpm build` must be green, and
+   `gitleaks git` over the full history must find no secrets.
 2. **release** — [semantic-release](https://semantic-release.gitbook.io)
    (`.releaserc.json`) reads the Conventional Commits since the last tag,
    computes the version, creates the tag `vX.Y.Z` and the GitHub Release with
@@ -16,7 +17,7 @@
    push `ghcr.io/<owner>/bcs-mcp:X.Y.Z` and `:latest`.
 
 Pull requests and non-`main` pushes run `.github/workflows/ci.yml`: verify,
-build, and a Docker build that is not pushed.
+build, gitleaks, and a Docker build that is not pushed.
 
 ## Versioning
 

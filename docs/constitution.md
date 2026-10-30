@@ -44,6 +44,7 @@
 - `tsc --noEmit` is clean (no type errors, no `any`).
 - `pnpm test` (vitest) is green.
 - `pnpm build` (tsup) succeeds for app-affecting changes.
+- gitleaks finds no secrets (prek pre-commit hook locally, `gitleaks git` in CI).
 - Commit messages follow Conventional Commits.
 
 ## Don'ts

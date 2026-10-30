@@ -85,6 +85,16 @@ pnpm dev           # build with watch mode
 pnpm test          # run tests
 ```
 
+### Secret scanning (gitleaks)
+
+Commits are scanned for secrets by a [prek](https://github.com/j178/prek) pre-commit hook (`.pre-commit-config.yaml`, gitleaks). Enable it once per clone:
+
+```bash
+prek install    # or: pre-commit install
+```
+
+CI runs `gitleaks git` over the full history on every PR and every push to `main`; a finding fails the pipeline and blocks the release. Never commit `.env` or the SSO cookies. If a secret was committed, rotate it, then rewrite history or add a justified entry to a `.gitleaksignore` file.
+
 ## Claude Desktop integration
 
 ### Stdio (recommended)
