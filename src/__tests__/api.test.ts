@@ -499,3 +499,19 @@ describe("api", () => {
     });
   });
 });
+
+describe("withoutCloseFlag", () => {
+  it("drops the close-task checkbox but keeps its marker and other fields", async () => {
+    const { withoutCloseFlag } = await import("../api.js");
+    const body = new URLSearchParams([
+      ["x,closeReferenceState,!listeditoid_T1_JTask.closeReferenceState", "false"],
+      ["x,closeReferenceState,listeditoid_T1_JTask.closeReferenceState", "true"],
+      ["x,description,listeditoid_T1_JTask.description", "work"],
+    ]);
+    const out = new URLSearchParams(withoutCloseFlag(body));
+    expect([...out.keys()]).toEqual([
+      "x,closeReferenceState,!listeditoid_T1_JTask.closeReferenceState",
+      "x,description,listeditoid_T1_JTask.description",
+    ]);
+  });
+});
