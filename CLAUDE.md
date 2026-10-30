@@ -54,6 +54,8 @@ BCS uses **form-based server-side rendering**, not a REST API.
 
 **2FA (TOTP):** When 2FA is enabled, BCS redirects all requests to `/bcs/totpVerification` after the password POST. `login()` probes with `GET /bcs` after the password step; on redirect to `/bcs/totpVerification`, it fetches the challenge page, parses the OTP input field (`totpVerificationCode`), generates a 6-digit code from `BCS_TOTP_SECRET` (Base32) via `otpauth`, and POSTs it with hidden fields (`pagetimestamp`, `!totpTrustBrowser`, `login=true`). If 2FA is required but `BCS_TOTP_SECRET` is not configured, login throws.
 
+**SSO/OIDC:** BCS performs the OIDC redirect itself, so the server cannot log in. With `BCS_SESSION_ID` + `BCS_CSRF_TOKEN` set (cookies copied from a browser login), `getSession()` returns them directly: no login, no `.bcs-session` file, no 30 min TTL. On 401/403/login redirect, `authenticatedFetch` throws an "SSO session expired" error instead of re-logging in. Username/password are then optional; config requires either both cookies or both credentials.
+
 ### Login flow
 
 1. GET `/bcs/login` -> extract JSESSIONID + pagetimestamp
@@ -159,7 +161,13 @@ Fetched from `/bcs/mybcs/vacation/display` with query params `userbudgets,Choice
 
 **Absence table**: `<tr class="selectableRow">` rows with `<td name="eventStartDate">`, `<td name="eventEndDate">`, `<td name="oid">` (subject in nested `<a><span>`), `<td name="eventType">`, `<td name="vacationDurationInPeriod">` (work days in `data-value-to-sum` attribute), `<td name="state">`. Dates in German format ("Do. 02.01.25"). Duration display varies: days ("10,00t") vs hours ("08:00h" for FZA), but `data-value-to-sum` always contains the numeric day value.
 
+### Week booking view (`src/week.ts`, `BCS_BOOKING_VIEW=week`)
+
+`/bcs/mybcs/multidaytimerecording/display` shows a task x day grid. Cell fields: `multidaytimerecording,Content,multidaytimerecordingTaskList,Columns,days,listeditoid_{TASK}.days_{TS},listeditoid_{TASK}.days_{TS}_hour|_minute` (`TS` = local midnight in ms) and the description in `...Columns,days,effortAttributesPopup,description,listeditoid_{TASK}.days_{TS}.effortAttributesPopup`. Book/edit = set the cell, delete = clear hour, minute and description, POST the whole form with `multidaytimerecording,Apply=Speichern`, re-read to verify. One entry per task and day. Rows of tasks that already have locked bookings render `readonly` and are rejected. Week selected via `multidaytimerecording,Selections,effortRecordingDate,year|month|day`. Verified live on an instance where the day view was read-only/layout-dependent.
+
 ## Known Gotchas
+
+- The day view (`dayeffortrecording`) is a user-configurable board: blocks (Anwesenheiten, Aufgabenbaum, Termine, ...) can be hidden per user/session, and the code needs Aufgabenbaum and Anwesenheiten. Saved efforts can be `readonly` there (status "Abgenommen").
 
 - `expandTreeNode()` returns `_JEffort` OIDs when effort exists on a task, not `_JTask`. Fallback verification via `effortTargetOid` matching is needed.
 - Form field deduplication: page HTML may already contain task fields from server-remembered tree expansion. Both `bookEffort()` and `deleteEffort()` filter duplicates.

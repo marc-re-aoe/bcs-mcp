@@ -134,8 +134,14 @@ describe("HTTP MCP Server", () => {
     const res = await fetch(`${baseUrl}/`);
     expect(res.status).toBe(404);
 
-    const res2 = await fetch(`${baseUrl}/health`);
+    const res2 = await fetch(`${baseUrl}/other`);
     expect(res2.status).toBe(404);
+  });
+
+  it("should answer /health with 200 for container probes", async () => {
+    const res = await fetch(`${baseUrl}/health`);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe("ok");
   });
 
   it("should create a session on initialize request", async () => {

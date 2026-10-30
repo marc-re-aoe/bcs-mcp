@@ -10,16 +10,38 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const SESSION_FILE = resolve(__dirname, "..", ".bcs-session");
 const SESSION_MAX_AGE_MS = 30 * 60 * 1000; // 30 minutes
 
-const envSchema = z.object({
-  BCS_URL: z.string().url(),
-  BCS_USERNAME: z.string().min(1),
-  BCS_PASSWORD: z.string().min(1),
-  BCS_USER_OID: z.string().min(1),
-  BCS_TOTP_SECRET: z.preprocess(
-    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
-    z.string().min(1).optional(),
-  ),
-});
+// Empty strings (e.g. `BCS_TOTP_SECRET=` in .env) count as unset.
+const optionalString = z.preprocess(
+  (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+  z.string().min(1).optional(),
+);
+
+// Two auth modes: username+password (optional TOTP), or SSO/OIDC where the
+// user logs in via the browser and supplies the resulting BCS cookies.
+const envSchema = z
+  .object({
+    BCS_URL: z.string().url(),
+    BCS_USERNAME: optionalString,
+    BCS_PASSWORD: optionalString,
+    BCS_USER_OID: z.string().min(1),
+    BCS_TOTP_SECRET: optionalString,
+    BCS_SESSION_ID: optionalString,
+    BCS_CSRF_TOKEN: optionalString,
+  })
+  .superRefine((env, ctx) => {
+    const required = (name: keyof typeof env, present: boolean) => {
+      if (!present) {
+        ctx.addIssue({ code: "custom", path: [name], message: "required" });
+      }
+    };
+    if (env.BCS_SESSION_ID || env.BCS_CSRF_TOKEN) {
+      required("BCS_SESSION_ID", Boolean(env.BCS_SESSION_ID));
+      required("BCS_CSRF_TOKEN", Boolean(env.BCS_CSRF_TOKEN));
+    } else {
+      required("BCS_USERNAME", Boolean(env.BCS_USERNAME));
+      required("BCS_PASSWORD", Boolean(env.BCS_PASSWORD));
+    }
+  });
 
 export type BcsConfig = z.infer<typeof envSchema>;
 
@@ -210,7 +232,25 @@ function generateTotpCode(secret: string, serverTimeMs: number): string {
   return totp.generate({ timestamp: serverTimeMs });
 }
 
+// SSO/OIDC mode: the session comes from the user's browser login, not from us.
+function ssoSession(config: BcsConfig): SessionData | null {
+  if (!config.BCS_SESSION_ID || !config.BCS_CSRF_TOKEN) return null;
+  return {
+    sessionId: config.BCS_SESSION_ID,
+    csrfToken: config.BCS_CSRF_TOKEN,
+    timestamp: Date.now(),
+  };
+}
+
+const SSO_EXPIRED_MESSAGE =
+  "BCS SSO session expired or invalid: log in to BCS in your browser and update BCS_SESSION_ID and BCS_CSRF_TOKEN (cookies JSESSIONID and CSRF_Token)";
+
 export async function login(config: BcsConfig): Promise<LoginResult> {
+  if (!config.BCS_USERNAME || !config.BCS_PASSWORD) {
+    throw new Error(
+      "Password login needs BCS_USERNAME and BCS_PASSWORD (SSO mode cannot log in by itself)",
+    );
+  }
   log("auth", "Login attempt", {
     user: config.BCS_USERNAME,
     url: config.BCS_URL,
@@ -366,6 +406,9 @@ export async function login(config: BcsConfig): Promise<LoginResult> {
 }
 
 export async function getSession(): Promise<SessionData> {
+  const sso = ssoSession(getConfig());
+  if (sso) return sso;
+
   if (
     cachedSession &&
     Date.now() - cachedSession.timestamp < SESSION_MAX_AGE_MS
@@ -438,6 +481,10 @@ export async function authenticatedFetch(
       "auth:fetch",
       "Session invalid (status or login/2FA redirect), re-authenticating",
     );
+    if (ssoSession(getConfig())) {
+      log("auth:fetch", "SSO session rejected by BCS");
+      throw new Error(SSO_EXPIRED_MESSAGE);
+    }
     await invalidateSession();
     const newSession = await getSession();
     const retryResponse = await makeRequest(newSession);
